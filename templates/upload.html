@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% block title %}Upload | Commerce Intelligence AI{% endblock %}
+{% block content %}
+<div class="upload-wrap">
+    <div class="eyebrow">COMMERCE INTELLIGENCE PLATFORM</div>
+    <h1>Understand your store.<br><span>Make smarter decisions.</span></h1>
+    <p class="muted lead">
+        Upload a WooCommerce order export. Then clean, aggregate and analyse
+        the data in three controlled stages.
+    </p>
+
+    <form class="upload-card" method="post" enctype="multipart/form-data">
+        <div class="upload-icon">⇧</div>
+        <h3>Upload WooCommerce order CSV</h3>
+        <p class="muted">CSV only · Up to 120 MB · Processed locally</p>
+        <input class="form-control" type="file" name="file" accept=".csv,text/csv" required>
+        <button class="btn btn-primary mt-3 w-100">Upload CSV and continue</button>
+    </form>
+
+    <div class="privacy-note">
+        The workflow uses local CSV processing only. Customer contact details,
+        billing/shipping addresses, IP addresses and order notes are excluded
+        from analytics outputs.
+    </div>
+</div>
+{% endblock %}

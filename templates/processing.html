@@ -1,0 +1,108 @@
+{% extends 'base.html' %}
+{% block title %}Data processing | Commerce Intelligence AI{% endblock %}
+{% block content %}
+<div class="page-head">
+    <div>
+        <div class="eyebrow">DATA WORKFLOW</div>
+        <h1>Prepare your store data</h1>
+        <p class="muted">Complete each stage in order. All reports use the same cleaned datasets.</p>
+        <p class="muted small">Uploaded file: <strong>{{ source }}</strong></p>
+    </div>
+</div>
+
+<div class="pipeline-grid">
+    <div class="panel pipeline-card">
+        <div class="pipeline-number">01</div>
+        <h3>Clean &amp; Validate CSV</h3>
+        <p class="muted">Parse dates and money, fix apostrophe-prefixed amounts, retain customer IDs, normalize products and validate quantities.</p>
+        {% if cleaning_ready %}
+            <span class="stage-state complete">Completed</span>
+        {% else %}
+            <span class="stage-state pending">Not started</span>
+        {% endif %}
+        <form method="post" action="{{ url_for('process_clean') }}">
+            <button class="btn btn-primary w-100 mt-3">
+                {{ 'Run cleaning again' if cleaning_ready else 'Clean & Validate CSV' }}
+            </button>
+        </form>
+        {% if cleaning_ready %}
+            <div class="stage-summary">
+                <div><strong>{{ "{:,}".format(cleaning_report.clean_order_rows) }}</strong><span>Clean orders</span></div>
+                <div><strong>{{ "{:,}".format(cleaning_report.product_line_rows) }}</strong><span>Product lines</span></div>
+                <div><strong>{{ "{:,}".format(cleaning_report.missing_sku_items) }}</strong><span>Missing SKUs</span></div>
+            </div>
+            {% if cleaning_report.warnings %}
+                <div class="alert alert-warning mt-3 mb-0">
+                    {{ cleaning_report.warnings|length }} numeric data-quality warning(s). Review the cleaning report before proceeding.
+                </div>
+            {% else %}
+                <div class="text-success small mt-3">No invalid non-empty monetary values detected.</div>
+            {% endif %}
+            <a class="small d-inline-block mt-2" href="{{ url_for('export', kind='cleaning-report') }}">Download cleaning report</a>
+        {% endif %}
+    </div>
+
+    <div class="panel pipeline-card">
+        <div class="pipeline-number">02</div>
+        <h3>Generate Analytics</h3>
+        <p class="muted">Create daily sales, product performance, customer RFM and discount datasets from the cleaned CSV.</p>
+        {% if analytics_ready %}
+            <span class="stage-state complete">Completed</span>
+        {% elif cleaning_ready %}
+            <span class="stage-state ready">Ready</span>
+        {% else %}
+            <span class="stage-state pending">Waiting for Stage 1</span>
+        {% endif %}
+        <form method="post" action="{{ url_for('process_analytics') }}">
+            <button class="btn btn-primary w-100 mt-3" {% if not cleaning_ready %}disabled{% endif %}>
+                {{ 'Regenerate analytics' if analytics_ready else 'Generate Analytics Reports' }}
+            </button>
+        </form>
+        {% if analytics_ready %}
+            <div class="stage-summary">
+                <div><strong>{{ "{:,}".format(analytics_summary.orders) }}</strong><span>Orders</span></div>
+                <div><strong>{{ "{:,.2f}".format(analytics_summary.revenue) }}</strong><span>Revenue</span></div>
+                <div><strong>{{ "{:,}".format(analytics_summary.products) }}</strong><span>Products</span></div>
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="panel pipeline-card">
+        <div class="pipeline-number">03</div>
+        <h3>Run Machine Learning</h3>
+        <p class="muted">Train and compare forecasting models, evaluate a chronological holdout and generate an initial 30-day forecast.</p>
+        {% if forecast_ready %}
+            <span class="stage-state complete">Completed</span>
+        {% elif analytics_ready %}
+            <span class="stage-state ready">Ready</span>
+        {% else %}
+            <span class="stage-state pending">Waiting for Stage 2</span>
+        {% endif %}
+        <form method="post" action="{{ url_for('process_forecast') }}">
+            <button class="btn btn-primary w-100 mt-3" {% if not analytics_ready %}disabled{% endif %}>
+                {{ 'Run ML forecasting again' if forecast_ready else 'Train & Generate Forecast' }}
+            </button>
+        </form>
+        {% if forecast_ready %}
+            <a href="{{ url_for('forecast') }}" class="small d-inline-block mt-2">Open forecasting report</a>
+        {% endif %}
+    </div>
+</div>
+
+{% if analytics_ready %}
+    <div class="panel mt-4">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+            <div>
+                <h3 class="mb-1">Analytics dashboard is ready</h3>
+                <p class="muted mb-0">All reports now read the normalized datasets generated in Stage 1.</p>
+            </div>
+            <a class="btn btn-primary" href="{{ url_for('dashboard') }}">Open full dashboard</a>
+        </div>
+    </div>
+{% endif %}
+
+<div class="notice mt-3">
+    Processing is local and file-based. No WooCommerce REST API, database connection
+    or external AI API is used. Re-uploading a CSV starts a new processing run.
+</div>
+{% endblock %}

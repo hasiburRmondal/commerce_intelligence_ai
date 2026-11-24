@@ -1,0 +1,415 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="page-head">
+    <div>
+        <div class="eyebrow">MACHINE LEARNING</div>
+        <h1>Sales Forecasting</h1>
+        <p class="muted">Recursive forecasting, rolling-origin model comparison and forecast diagnostics.</p>
+    </div>
+
+    <form method="post" class="horizon-form">
+        <select name="horizon" class="form-select" aria-label="Forecast horizon">
+            {% for h in [7, 30, 60, 90] %}
+                <option value="{{ h }}" {% if horizon == h %}selected{% endif %}>{{ h }} days</option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-primary">Generate Forecast</button>
+    </form>
+</div>
+
+{% if result.available %}
+    <div class="panel">
+        <div class="panel-head">
+            <div>
+                <h3>Future Daily Revenue Forecast</h3>
+                <p class="muted">Next {{ result.horizon }} days using {{ result.winner }}.</p>
+            </div>
+            <span class="tag">{{ result.winner }}</span>
+        </div>
+        <div style="height: 280px; position: relative;">
+            <canvas id="forecastChart"></canvas>
+        </div>
+        {% if result['values'] %}
+            <div class="forecast-summary-grid mt-3">
+                <div class="mini-stat">
+                    <span class="muted">Forecast total</span>
+                    <strong>{{ "%.2f"|format(result['values']|sum) }}</strong>
+                </div>
+                <div class="mini-stat">
+                    <span class="muted">Daily average</span>
+                    <strong>{{ "%.2f"|format((result['values']|sum) / (result['values']|length)) }}</strong>
+                </div>
+                <div class="mini-stat">
+                    <span class="muted">Forecast horizon</span>
+                    <strong>{{ result.horizon }} days</strong>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="panel mt-4">
+        <h3>Model Evaluation</h3>
+        <p class="muted">
+            Expanding-window recursive rolling-origin backtesting.
+            {{ result.fold_count if result.fold_count is defined else (result.folds|length) }} validation folds.
+            Lower MAE, RMSE and WAPE are better. Bias indicates average predicted minus actual revenue.
+        </p>
+        <div class="table-responsive">
+            <table class="table table-dark table-hover">
+                <thead>
+                    <tr>
+                        <th>Model</th>
+                        <th>MAE</th>
+                        <th>RMSE</th>
+                        <th>WAPE</th>
+                        <th>Bias</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for m in result.metrics %}
+                        <tr>
+                            <td>
+                                {{ m.model }}
+                                {% if m.model == result.winner %}
+                                    <span class="tag">Selected</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ "%.2f"|format(m.mae) }}</td>
+                            <td>{{ "%.2f"|format(m.rmse) }}</td>
+                            <td>{{ "%.2f%%"|format(m.wape) if m.wape is not none else 'N/A' }}</td>
+                            <td>{{ "%.2f"|format(m.bias) if m.bias is defined else 'N/A' }}</td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="5" class="muted">No model metrics are available.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {% if result.horizon_metrics %}
+        <div class="panel mt-4">
+            <h3>Accuracy by Forecast Horizon</h3>
+            <p class="muted">Each horizon is evaluated recursively across expanding-window validation folds. Compare models within the same horizon.</p>
+            <div class="table-responsive">
+                <table class="table table-dark table-hover">
+                    <thead>
+                        <tr>
+                            <th>Horizon</th>
+                            <th>Model</th>
+                            <th>MAE</th>
+                            <th>RMSE</th>
+                            <th>WAPE</th>
+                            <th>Bias</th>
+                            <th>Folds</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in result.horizon_metrics %}
+                            <tr>
+                                <td>{{ row.horizon }} days</td>
+                                <td>{{ row.model }}</td>
+                                <td>{{ "%.2f"|format(row.mae) }}</td>
+                                <td>{{ "%.2f"|format(row.rmse) }}</td>
+                                <td>{{ "%.2f%%"|format(row.wape) if row.wape is not none else 'N/A' }}</td>
+                                <td>{{ "%.2f"|format(row.bias) }}</td>
+                                <td>{{ row.fold_count }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% endif %}
+
+    <div class="panel mt-4">
+        <h3>Actual vs Predicted Revenue</h3>
+        <p class="muted">
+            Out-of-fold recursive predictions using {{ result.winner }}.
+            Future actual values are not used as inputs during each forecast horizon.
+        </p>
+        <div style="height: 300px; position: relative;">
+            <canvas id="backtestChart"></canvas>
+        </div>
+    </div>
+
+    {% if result.residual_summary %}
+        <div class="panel mt-4">
+            <h3>Residual Analysis</h3>
+            <p class="muted">Residual = actual revenue − predicted revenue. Positive residuals indicate underprediction; negative residuals indicate overprediction.</p>
+            <div class="forecast-summary-grid">
+                <div class="mini-stat">
+                    <span class="muted">Mean residual</span>
+                    <strong>{{ "%.2f"|format(result.residual_summary.mean_error) }}</strong>
+                </div>
+                <div class="mini-stat">
+                    <span class="muted">Mean absolute residual</span>
+                    <strong>{{ "%.2f"|format(result.residual_summary.mean_absolute_error) }}</strong>
+                </div>
+                <div class="mini-stat">
+                    <span class="muted">Residual standard deviation</span>
+                    <strong>{{ "%.2f"|format(result.residual_summary.residual_std) }}</strong>
+                </div>
+                <div class="mini-stat">
+                    <span class="muted">Underprediction days</span>
+                    <strong>{{ result.residual_summary.underprediction_days }}</strong>
+                </div>
+                <div class="mini-stat">
+                    <span class="muted">Overprediction days</span>
+                    <strong>{{ result.residual_summary.overprediction_days }}</strong>
+                </div>
+                <div class="mini-stat">
+                    <span class="muted">Zero-error days</span>
+                    <strong>{{ result.residual_summary.zero_error_days }}</strong>
+                </div>
+            </div>
+            {% if result.residual_rows %}
+                <div style="height: 230px; position: relative;" class="mt-3">
+                    <canvas id="residualChart"></canvas>
+                </div>
+            {% endif %}
+        </div>
+    {% endif %}
+
+    {% if result.feature_importance %}
+        <div class="panel mt-4">
+            <h3>Feature Importance</h3>
+            <p class="muted">Permutation importance measures how much validation MAE changes when a feature is shuffled. Larger positive values indicate greater predictive contribution in this evaluation.</p>
+            <div style="height: 320px; position: relative;">
+                <canvas id="importanceChart"></canvas>
+            </div>
+            <div class="table-responsive mt-3">
+                <table class="table table-dark table-hover">
+                    <thead><tr><th>Feature</th><th>Importance</th></tr></thead>
+                    <tbody>
+                        {% for item in result.feature_importance %}
+                            <tr>
+                                <td>{{ item.feature }}</td>
+                                <td>{{ "%.4f"|format(item.importance) }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% endif %}
+
+    {% if result.folds %}
+        <div class="panel mt-4">
+            <h3>Rolling-Origin Validation Folds</h3>
+            <p class="muted">Each fold trains on earlier dates and validates on the following block of days.</p>
+            <div class="table-responsive">
+                <table class="table table-dark table-hover">
+                    <thead>
+                        <tr>
+                            <th>Fold</th>
+                            <th>Training days</th>
+                            <th>Validation days</th>
+                            <th>Validation start</th>
+                            <th>Validation end</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for fold in result.folds %}
+                            <tr>
+                                <td>{{ fold.fold }}</td>
+                                <td>{{ fold.train_size }}</td>
+                                <td>{{ fold.validation_size }}</td>
+                                <td>{{ fold.start }}</td>
+                                <td>{{ fold.end }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% endif %}
+
+    <div class="panel mt-4">
+        <div class="panel-head">
+            <div>
+                <h3>Prediction Backtesting Details</h3>
+                <p class="muted">Out-of-fold recursive predictions compared with actual revenue.</p>
+            </div>
+            {% if result.backtest_rows %}
+                <a class="btn btn-outline-light btn-sm"
+                   href="{{ url_for('export_forecast_backtest', horizon=horizon) }}">
+                    Download CSV
+                </a>
+            {% endif %}
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-dark table-hover">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Actual Revenue</th>
+                        <th>Predicted Revenue</th>
+                        <th>Error</th>
+                        <th>Absolute Error</th>
+                        <th>Error %</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in result.backtest_rows %}
+                        <tr>
+                            <td>{{ row.date }}</td>
+                            <td>{{ "%.2f"|format(row.actual_revenue) }}</td>
+                            <td>{{ "%.2f"|format(row.predicted_revenue) }}</td>
+                            <td>{{ "%.2f"|format(row.error) }}</td>
+                            <td>{{ "%.2f"|format(row.absolute_error) }}</td>
+                            <td>{{ "%.2f%%"|format(row.error_pct) if row.error_pct is not none else 'N/A' }}</td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="6" class="muted">No backtesting rows are available.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="notice mt-3">
+        Forecasts are estimates, not guarantees. Rolling-origin backtesting provides a more realistic
+        estimate of recursive forecast performance, but historical results do not guarantee future
+        accuracy. One year of history provides limited evidence for annual seasonality. Feature
+        importance is model-specific and should not be interpreted as causation.
+    </div>
+{% else %}
+    <div class="panel">
+        {{ result.message }}
+    </div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if result.available %}
+<script>
+    renderLineChart(
+        'forecastChart',
+        {{ result['labels'] | tojson }},
+        {{ result['values'] | tojson }},
+        'Forecast Revenue'
+    );
+
+    const backtestCanvas = document.getElementById('backtestChart');
+    if (backtestCanvas) {
+        new Chart(backtestCanvas, {
+            type: 'line',
+            data: {
+                labels: {{ result['actual_labels'] | tojson }},
+                datasets: [
+                    {
+                        label: 'Actual Revenue',
+                        data: {{ result['actual_values'] | tojson }},
+                        borderColor: '#16c784',
+                        backgroundColor: 'rgba(22,199,132,0.08)',
+                        pointRadius: 2,
+                        pointHoverRadius: 4,
+                        borderWidth: 2,
+                        tension: 0.15
+                    },
+                    {
+                        label: 'Predicted Revenue',
+                        data: {{ result['predicted_values'] | tojson }},
+                        borderColor: '#579bff',
+                        backgroundColor: 'rgba(87,155,255,0.08)',
+                        pointRadius: 2,
+                        pointHoverRadius: 4,
+                        borderWidth: 2,
+                        tension: 0.15
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: { legend: { labels: { color: '#aeb6c5' } } },
+                scales: {
+                    x: {
+                        ticks: { color: '#8f9aaa', maxRotation: 55, minRotation: 35 },
+                        grid: { color: 'rgba(255,255,255,.05)' }
+                    },
+                    y: {
+                        ticks: { color: '#8f9aaa' },
+                        grid: { color: 'rgba(255,255,255,.06)' }
+                    }
+                }
+            }
+        });
+    }
+
+    {% if result.residual_rows %}
+    const residualCanvas = document.getElementById('residualChart');
+    if (residualCanvas) {
+        new Chart(residualCanvas, {
+            type: 'bar',
+            data: {
+                labels: {{ result.residual_rows | map(attribute='date') | list | tojson }},
+                datasets: [{
+                    label: 'Residual (Actual − Predicted)',
+                    data: {{ result.residual_rows | map(attribute='residual') | list | tojson }},
+                    backgroundColor: 'rgba(87,155,255,0.55)',
+                    borderColor: '#579bff',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { labels: { color: '#aeb6c5' } } },
+                scales: {
+                    x: {
+                        ticks: { color: '#8f9aaa', maxRotation: 55, minRotation: 35 },
+                        grid: { color: 'rgba(255,255,255,.05)' }
+                    },
+                    y: {
+                        ticks: { color: '#8f9aaa' },
+                        grid: { color: 'rgba(255,255,255,.06)' }
+                    }
+                }
+            }
+        });
+    }
+    {% endif %}
+
+    {% if result.feature_importance %}
+    const importanceCanvas = document.getElementById('importanceChart');
+    if (importanceCanvas) {
+        new Chart(importanceCanvas, {
+            type: 'bar',
+            data: {
+                labels: {{ result.feature_importance | map(attribute='feature') | list | tojson }},
+                datasets: [{
+                    label: 'Permutation importance (MAE increase)',
+                    data: {{ result.feature_importance | map(attribute='importance') | list | tojson }},
+                    backgroundColor: 'rgba(22,199,132,0.55)',
+                    borderColor: '#16c784',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { labels: { color: '#aeb6c5' } } },
+                scales: {
+                    x: {
+                        ticks: { color: '#8f9aaa' },
+                        grid: { color: 'rgba(255,255,255,.06)' },
+                        title: { display: true, text: 'Increase in validation MAE', color: '#aeb6c5' }
+                    },
+                    y: {
+                        ticks: { color: '#8f9aaa' },
+                        grid: { color: 'rgba(255,255,255,.05)' }
+                    }
+                }
+            }
+        });
+    }
+    {% endif %}
+</script>
+{% endif %}
+{% endblock %}
