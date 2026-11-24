@@ -1,75 +1,337 @@
 # Commerce Intelligence AI
 
-A local, CSV-powered WooCommerce analytics and demand forecasting application built with Flask, Pandas, scikit-learn, Jinja2 and Chart.js. It does not connect to WooCommerce, use a database, or call an external AI API.
+A local, CSV-powered **WooCommerce Analytics and Machine Learning Forecasting Application** built with Python, Flask, Pandas, Scikit-learn, Jinja2, and Chart.js.
 
-## Features
+Commerce Intelligence AI transforms exported WooCommerce order data into actionable business insights through sales analytics, product performance analysis, customer segmentation, and machine learning-based demand forecasting.
 
+**Designed for local execution:** No WooCommerce REST API, external database, or external AI API is required.
+
+---
+
+## Key Features
+
+### 1. WooCommerce CSV Processing
 - Upload WooCommerce order CSV exports (up to 120 MB).
-- Parse order dates, statuses, totals and Product Item 1–60 line-item columns.
-- Sales KPIs, daily/monthly revenue charts and period comparison.
-- Product performance table and chart.
-- Customer RFM-style segments using customer ID/user ID only.
-- Order discount summary.
-- Seasonal Naive, Random Forest and HistGradientBoosting comparison with chronological holdout; MAE, RMSE and WAPE.
-- Recursive 7/30/60/90-day store-level sales forecast.
-- Local rule-based analytics assistant.
-- Daily sales and product CSV exports.
+- Parse order dates, statuses, order totals, discounts, and fees.
+- Extract product information from structured `Product Item 1–60` columns.
+- Normalize numeric values and handle mixed date formats.
+- Generate cleaning diagnostics for invalid numeric values.
 
-## Requirements
+### 2. Sales Analytics
+- Total revenue and key business performance indicators.
+- Daily and monthly sales analysis.
+- Revenue charts and period comparisons.
+- Order discount summaries.
+- Daily sales CSV export.
 
-Python 3.10–3.12 recommended.
+### 3. Product Performance Analysis
+- Product-level sales and revenue analysis.
+- Product quantity and performance summaries.
+- Product performance tables and visualizations.
+- Product CSV export.
 
-## Setup
+### 4. Customer Segmentation
+- RFM-style customer segmentation.
+- Customer analysis using customer ID or user ID.
+- Recency, frequency, and monetary-based insights.
+- Customer identification through IDs rather than exposing customer contact information.
+
+### 5. Machine Learning-Based Sales Forecasting
+
+Compare multiple forecasting approaches using historical WooCommerce sales data.
+
+**Implemented models:**
+- Seasonal Naive
+- Random Forest Regressor
+- HistGradientBoosting Regressor
+
+**Model evaluation metrics:**
+- MAE (Mean Absolute Error)
+- RMSE (Root Mean Squared Error)
+- WAPE (Weighted Absolute Percentage Error)
+
+**Forecasting capabilities:**
+- Chronological train/test evaluation.
+- Model performance comparison.
+- Recursive sales forecasting.
+- 7-day, 30-day, 60-day, and 90-day forecast horizons.
+
+### 6. Local Analytics Assistant
+- Rule-based analytics assistant.
+- Answers predefined business questions using locally processed analytics.
+- Does not require an external generative AI service.
+
+---
+
+## Technology Stack
+
+| Category | Technologies |
+|---|---|
+| Programming Language | Python |
+| Backend | Flask |
+| Data Processing | Pandas, NumPy |
+| Machine Learning | Scikit-learn |
+| Frontend | HTML, CSS, JavaScript, Jinja2 |
+| Data Visualization | Chart.js |
+| Data Input | WooCommerce CSV Export |
+| Testing | Pytest |
+
+---
+
+## Application Workflow
+
+```text
+WooCommerce CSV Export
+        |
+        v
+CSV Upload and Validation
+        |
+        v
+Data Cleaning and Normalization
+        |
+        v
+Data Processing with Pandas
+        |
+        +--------------------------+
+        |                          |
+        v                          v
+   Sales Analytics          Product Analytics
+        |                          |
+        v                          v
+   Customer Segmentation    Product Performance
+        |
+        v
+Sales Forecasting
+        |
+        v
+Model Comparison and Evaluation
+        |
+        v
+7 / 30 / 60 / 90-Day Forecast
+        |
+        v
+Flask Dashboard and Reports
+```
+
+---
+
+## Installation and Setup
+
+### Requirements
+
+- Python 3.10–3.12 recommended.
+- pip
+- Git
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/YOUR_USERNAME/commerce-intelligence-ai.git
+cd commerce-intelligence-ai
+```
+
+### 2. Create a virtual environment
 
 ```bash
 python -m venv .venv
-# Windows: .venv\Scripts\activate
-# macOS/Linux: source .venv/bin/activate
+```
+
+Activate it:
+
+**Windows**
+```bash
+.venv\Scripts\activate
+```
+
+**macOS / Linux**
+```bash
+source .venv/bin/activate
+```
+
+### 3. Install dependencies
+
+```bash
 pip install -r requirements.txt
+```
+
+### 4. Start the application
+
+```bash
 python app.py
 ```
 
-Open http://127.0.0.1:5000.
+Open the application in your browser:
 
-## Expected CSV columns
+```text
+http://127.0.0.1:5000
+```
 
-Required: `order_id`, `order_date`, `status`. Sales totals use `order_total`; discounts use `discount_total`. Product parsing supports `Product Item N Name`, `Product Item N id`, `Product Item N SKU`, `Product Item N Quantity`, `Product Item N Total`, and `Product Item N Subtotal`, for N=1..60. Customer analysis uses `customer_id` or `customer_user`. Missing optional columns are handled.
+---
 
-## Important data assumptions
+## Expected CSV Format
 
-- By default, `completed` and `processing` orders are included. If neither status exists in the file, a fallback excludes cancelled, failed, refunded, trash and draft statuses. Review this policy for your store before interpreting totals.
-- Order-level revenue uses `order_total`. Product revenue uses line-item `Product Item N Total`. These can differ because of shipping, tax, discounts and refunds.
-- Duplicate order IDs are reduced to one order row (last occurrence) to avoid double-counting order totals. Product line items are extracted from the export rows and filtered to accepted order IDs.
-- This first version expects the structured `Product Item N ...` columns. It does not parse serialized `line_item_N` blobs.
-- Customer IDs are used for segmentation and are still pseudonymous personal data. Keep the CSV on a trusted machine and remove uploads when finished.
-- The app stores the uploaded CSV temporarily in `uploads/`. Use the **Remove uploaded data** button when done. Do not expose this development server publicly.
-- Chart.js is loaded from a CDN, so charts require internet access in the browser. All business data processing and ML run locally.
-- The local assistant is rule-based, not a generative AI model.
-- A single year of data is limited for annual seasonality; forecasts are estimates. Product-level forecasts and stock/reorder advice are not claimed in this version.
+The application expects a WooCommerce order export containing the following fields.
+
+### Required columns
+
+| Column | Description |
+|---|---|
+| `order_id` | Unique order identifier |
+| `order_date` | Order creation date |
+| `status` | WooCommerce order status |
+
+### Sales and discount columns
+
+| Column | Description |
+|---|---|
+| `order_total` | Total order value |
+| `discount_total` | Total order discount |
+
+### Product line-item columns
+
+The application supports structured product columns from `Product Item 1` through `Product Item 60`.
+
+Examples:
+
+```text
+Product Item 1 Name
+Product Item 1 id
+Product Item 1 SKU
+Product Item 1 Quantity
+Product Item 1 Total
+Product Item 1 Subtotal
+```
+
+### Customer identification
+
+Customer analysis uses either:
+
+```text
+customer_id
+customer_user
+```
+
+Missing optional columns are handled by the application.
+
+---
+
+## Data Cleaning and Processing
+
+The CSV processing pipeline includes several normalization steps:
+
+- Supports mixed date formats.
+- Converts monetary fields into numeric values.
+- Removes leading apostrophes from numeric values while preserving negative amounts.
+- Handles missing and invalid numeric values through diagnostics.
+- Processes order and product line-item data separately.
+- Includes fee and other monetary fields in normalized order data.
+
+**Negative fee values are preserved.** For example:
+
+```text
+'-28.99  ->  -28.99
+```
+
+Negative `fee_total` values represent custom discount adjustments in this dataset and are not converted into positive amounts.
+
+### Product quantity handling
+
+Product quantities are interpreted as individual units.
+
+Pack metadata, such as `3pc`, `By Box(5)`, or `Value Pack(15)`, is not used to multiply the exported product quantity.
+
+---
+
+## Important Data Assumptions and Limitations
+
+### Order status handling
+- By default, `completed` and `processing` orders are included.
+- If neither status exists, a fallback excludes cancelled, failed, refunded, trash, and draft statuses.
+- Review the order status policy before interpreting revenue figures.
+
+### Revenue calculations
+- Order-level revenue uses `order_total`.
+- Product-level revenue uses `Product Item N Total`.
+- These values may differ because of shipping, taxes, discounts, and refunds.
+
+### Duplicate orders
+- Duplicate order IDs are reduced to one order row using the last occurrence to avoid double-counting order totals.
+- Product line items are extracted from export rows and filtered against accepted order IDs.
+
+### Product parsing
+- The current implementation expects structured `Product Item N ...` columns.
+- Serialized `line_item_N` data is not parsed.
+
+### Forecasting limitations
+- Forecasts are based on historical store-level sales data.
+- A single year of historical data limits the ability to learn annual seasonal patterns.
+- Forecasts are estimates, not guaranteed future sales.
+- Product-level forecasting and automatic stock/reorder recommendations are not implemented in this version.
+
+---
+
+## Privacy and Security
+
+This application is designed for local processing of WooCommerce exports.
+
+- Customer names, email addresses, phone numbers, billing addresses, shipping addresses, IP addresses, and other unnecessary personal information are not required for the analytics outputs.
+- Customer IDs used for segmentation are still pseudonymous personal data.
+- Uploaded CSV files are temporarily stored in the `uploads/` directory.
+- Use the **Remove uploaded data** button when finished.
+- Keep exported business data on a trusted machine.
+- Do not expose the Flask development server publicly.
+
+**External services:** Business data processing and ML execution run locally. Chart.js is loaded from a CDN, so internet access is required in the browser to render charts.
+
+---
 
 ## Configuration
 
-Set `SECRET_KEY` as an environment variable before deployment. Set `debug=False` and use a production WSGI server for any non-development environment. This project is designed for local use, not public multi-user hosting.
+Before using the application outside local development:
 
+- Configure `SECRET_KEY` through an environment variable.
+- Set `debug=False`.
+- Use a production WSGI server.
+- Configure appropriate upload restrictions and server security.
 
-## CSV cleaning updates
+This project is designed for local use, not public multi-user hosting.
 
-The CSV reader now removes leading apostrophes from numeric values while
-preserving negative amounts. For example, `'-28.99` becomes `-28.99`.
-Negative `fee_total` values remain negative custom-discount adjustments.
+---
 
-It also parses mixed date formats, includes `fee_total` and other monetary
-fields in the normalized order data, and reports invalid non-empty numeric
-values in `data['numeric_diagnostics']`.
+## Running Tests
 
-The product export quantity is treated as individual units, as confirmed for
-this project. Pack metadata must not multiply this quantity.
-
-The application remains CSV-only: no WooCommerce REST API, database, or
-external AI API is required.
-
-Run the regression tests from the project root:
+Run the regression test suite from the project root:
 
 ```bash
 pytest -q
 ```
+
+---
+
+## Project Objectives
+
+This project demonstrates practical application of:
+
+- Python-based data processing.
+- Data cleaning and exploratory data analysis.
+- Business analytics and KPI reporting.
+- Customer segmentation.
+- Supervised machine learning and regression.
+- Time-series forecasting techniques.
+- Model comparison and evaluation.
+- Flask-based application development.
+- Interactive data visualization.
+
+## Future Improvements
+
+Potential future development areas:
+
+- More robust rolling-origin forecasting evaluation.
+- SKU-level demand forecasting.
+- Additional forecasting algorithms.
+- Forecast uncertainty estimation.
+- Automated data quality reporting.
+- Model monitoring and performance tracking.
+- Improved inventory planning capabilities.
+
+---
